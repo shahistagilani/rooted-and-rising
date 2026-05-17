@@ -74,7 +74,7 @@ test = "rooted_and_rising_crew.main:test"
 run_with_trigger = "rooted_and_rising_crew.main:run_with_trigger"
 
 [tool.hatch.build.targets.wheel]
-packages = ["backend"]
+packages = ["src/rooted_and_rising_crew"]
 
 [tool.crewai]
 type = "crew"
@@ -98,7 +98,7 @@ select = [
 ignore = ["E501"]  # line length handled by formatter
 
 [tool.ruff.lint.isort]
-known-first-party = ["backend"]
+known-first-party = ["rooted_and_rising_crew"]
 
 # ── Mypy ─────────────────────────────────────────────────────────────────────
 [tool.mypy]
@@ -111,11 +111,11 @@ plugins = ["pydantic.mypy"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=backend --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=rooted_and_rising_crew --cov-report=term-missing --cov-fail-under=80"
 
 # ── Coverage ──────────────────────────────────────────────────────────────────
 [tool.coverage.run]
-source = ["backend"]
+source = ["rooted_and_rising_crew"]
 omit = ["*/tests/*", "*/migrations/*"]
 
 [tool.coverage.report]

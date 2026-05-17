@@ -1,17 +1,111 @@
-research_task:
+journal_task:
   description: >
-    Conduct a thorough research about {topic}
-    Make sure you find any interesting and relevant information given
-    the current year is {current_year}.
-  expected_output: >
-    A list with 10 bullet points of the most relevant information about {topic}
-  agent: researcher
+    Classify this journal entry for {child_name} (today is {current_date}):
 
-reporting_task:
-  description: >
-    Review the context you got and expand each topic into a full section for a report.
-    Make sure the report is detailed and contains any and all relevant information.
+    "{journal_text}"
+
+    Determine:
+    1. The single best-fit growth domain from: academics, outdoor, values, family, creative
+       - academics: homework, books, reading, curiosity-driven learning
+       - outdoor: physical activity, sports, biking, nutrition, sleep
+       - values: character, empathy, responsibility, spiritual stories, religious education
+       - family: quality time with family or friends, social skills, screen balance
+       - creative: art, music, dance, drama, imaginative play, crafts
+    2. A concise 1-2 sentence summary of what the child did and experienced.
+    3. Relevant tags (3-6 keywords, lowercase, e.g. "reading", "cricket", "cooking").
+    4. Library candidates: specific named items mentioned — book titles, food names,
+       or activity names (e.g. "Diary of a Wimpy Kid", "dosa", "Bharatanatyam").
+       Return an empty list if nothing specific is named.
   expected_output: >
-    A fully fledged report with the main topics, each with a full section of information.
-    Formatted as markdown without '```'
-  agent: reporting_analyst
+    A JSON object with these exact fields:
+    - child_name: string (the child's name)
+    - date: string (today's date in ISO format YYYY-MM-DD)
+    - domain: string (one of: academics, outdoor, values, family, creative)
+    - summary: string (1-2 sentences describing what the child did)
+    - raw_text: string (the original journal text, copied verbatim)
+    - tags: array of strings (3-6 lowercase keywords)
+    - library_candidates: array of strings (named books, foods, or activities; empty if none)
+    - media: empty array []
+  agent: journal_agent
+
+library_task:
+  description: >
+    Using the journal entry analysis above for {child_name}, extract specific named
+    items to add to the child's personal library collections.
+
+    Focus on the library_candidates and tags from the journal entry.
+    Look for:
+    - Books: specific titles mentioned (add author and genre if you know them)
+    - Foods: specific named foods tried, cooked, or enjoyed
+    - Activities: named activities the child did (e.g. "swimming", "Lego", "veena class")
+
+    Rules:
+    - Only extract items EXPLICITLY mentioned — never invent or assume
+    - If a candidate is ambiguous (e.g. "game"), skip it unless a specific name is clear
+    - Set status to "tried" by default unless the text implies mastery ("loves", "mastered")
+    - For books, set domain to "academics" unless clearly otherwise
+    - For activities, infer domain from the journal entry's classified domain
+  expected_output: >
+    A JSON object with exactly these three arrays (any may be empty):
+    - books: array of {title, author, genre, domain, status} objects
+    - foods: array of {name, category, status} objects
+    - activities: array of {name, domain, status} objects
+    Where domain is one of: academics, outdoor, values, family, creative
+    And status is one of: tried, enjoys, mastered, loves, dislikes
+  agent: library_agent
+
+balance_task:
+  description: >
+    Analyse {child_name}'s growth domain balance over the past {window_days} days.
+
+    Activity history (days since last entry, entries in window):
+    {domain_history}
+
+    Plus the new journal entry classified above (add it to the appropriate domain count).
+
+    Apply these rules to determine status:
+    - balanced: last activity 0-3 days ago, OR 2+ entries in window
+    - low: last activity 4-7 days ago AND fewer than 2 entries in window
+    - neglected: last activity 8+ days ago, OR zero entries in window
+
+    Write a warm, specific 2-3 sentence parent-facing summary. Name the neglected
+    domains explicitly. Frame the situation constructively — empower, don't alarm.
+  expected_output: >
+    A JSON object with:
+    - child_name: string
+    - window_days: integer (the analysis window)
+    - domain_scores: array of 5 objects, one per domain, each with:
+        domain (academics/outdoor/values/family/creative),
+        last_activity_days_ago (integer),
+        entry_count (integer),
+        status (balanced/low/neglected)
+    - neglected_domains: array of domain strings with status "neglected"
+    - summary: string (2-3 warm sentences for the parent)
+  agent: balance_analyser
+
+planning_task:
+  description: >
+    Create a weekly activity plan for {child_name} using the gap report above.
+
+    Design 4-6 specific activities that:
+    1. Target the neglected and low domains identified in the gap report
+    2. Are appropriate for a 6-10 year old Indian child
+    3. Include a mix of indoor and outdoor options where possible
+    4. Are achievable in 20-45 minutes
+    5. Name a specific activity — never a vague goal (NOT "read more", YES "Read chapters
+       1-3 of 'The Magic Faraway Tree' together")
+    6. Include a one-sentence reason explaining why this activity helps the child grow
+
+    The week starts on the Monday of the current week ({week_start}).
+  expected_output: >
+    A JSON object with:
+    - child_name: string
+    - week_start: string (Monday's date in ISO format YYYY-MM-DD, use {week_start})
+    - focus_domains: array of domain strings (the neglected/low domains being addressed)
+    - activities: array of 4-6 objects, each with:
+        title: string (short activity name)
+        description: string (what to do, including the reason it helps)
+        domain: string (one of: academics, outdoor, values, family, creative)
+        source: string (always "ai")
+        completed: boolean (always false)
+  agent: planner_agent
