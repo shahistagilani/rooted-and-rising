@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 """
-Rooted and Rising — live interactive entry point.
+Rooted and Rising — hardcoded demo run (no prompts).
 
-Prompts the parent for their child's name and today's journal entry,
-loads the rolling domain history from SQLite, runs the full agent
-pipeline, saves all results back to the database, then prints a
-formatted summary.
+Uses a fixed journal entry for Aryan but still reads domain history from
+SQLite (so repeated demo runs accumulate realistic context) and saves
+all results back to the database.
+
+Useful for CI, smoke-testing, and first-run demonstrations.
 
 Usage:
-    crewai run          (from rooted_and_rising_crew/ directory)
-    make run            (from repo root)
-    .venv/bin/python -m rooted_and_rising_crew.main
+    make demo
+    .venv/bin/python -m rooted_and_rising_crew.main_demo
 """
 from __future__ import annotations
 
@@ -35,28 +35,22 @@ from rooted_and_rising_crew.repository import (
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
+# ── Demo fixtures ─────────────────────────────────────────────────────────────
 
-# ── Input helpers ─────────────────────────────────────────────────────────────
+_DEMO_CHILD = "Aryan"
 
-def _prompt(label: str, default: str = "") -> str:
-    hint = f" [{default}]" if default else ""
-    value = input(f"  {label}{hint}: ").strip()
-    return value or default
+_DEMO_JOURNAL = (
+    "Aryan finished his maths homework really quickly today and then spent an hour "
+    "reading 'The Magic Faraway Tree' by Enid Blyton. He was so excited that he "
+    "re-told me the whole first chapter at dinner!"
+)
 
-
-def _prompt_multiline(label: str) -> str:
-    print(f"  {label}")
-    print("  (type your entry below; press Enter on an empty line when done)\n")
-    lines: list[str] = []
-    while True:
-        line = input("  > ")
-        if line == "":
-            if lines:
-                break
-            print("  (please write something first, then press Enter on an empty line)")
-        else:
-            lines.append(line)
-    return " ".join(lines)
+# Kept for train/test entry points that need a fully self-contained inputs dict
+_DEMO_HISTORY = """- academics: 1 day ago (3 entries in window)
+- outdoor: 9 days ago (0 entries in window)
+- values: 5 days ago (1 entry in window)
+- family: 2 days ago (2 entries in window)
+- creative: 11 days ago (0 entries in window)"""
 
 
 def _monday_of_week(today: date) -> str:
@@ -79,44 +73,12 @@ def _build_inputs(
     }
 
 
-def _collect_inputs() -> tuple[str, str]:
-    """
-    Prompt the parent for child name and today's journal entry.
-    Returns (child_name, journal_text).
-    Domain history is loaded from the database — no manual entry needed.
-    """
-    print()
-    print("╔══════════════════════════════════════════════════════════╗")
-    print("║         🌱  ROOTED AND RISING  —  Child Co-pilot         ║")
-    print("║           Grounded in values. Growing every day.         ║")
-    print("╚══════════════════════════════════════════════════════════╝")
-    print()
-
-    print("─── Step 1 of 2: Child's name ───────────────────────────")
-    child_name = _prompt("Child's name", default="")
-    while not child_name:
-        print("  Name cannot be empty.")
-        child_name = _prompt("Child's name", default="")
-
-    print()
-    print("─── Step 2 of 2: Today's journal entry ──────────────────")
-    print(f"  What did {child_name} do today? Be as natural as you like —")
-    print("  mention books read, food tried, games played, anything!\n")
-    journal_text = _prompt_multiline("Journal entry:")
-
-    print()
-    print(f"  ✓  Got it! Loading {child_name}'s history and running analysis...")
-    print("  (This takes about 30–60 seconds)\n")
-
-    return child_name, journal_text
-
-
 # ── Flow ─────────────────────────────────────────────────────────────────────
 
 class GrowthState(BaseModel):
-    child_name: str = ""
-    journal_text: str = ""
-    domain_history: str = ""   # populated from DB before kickoff
+    child_name: str = _DEMO_CHILD
+    journal_text: str = _DEMO_JOURNAL
+    domain_history: str = ""
     journal_entry: JournalEntry | None = None
     library_items: LibraryExtraction | None = None
     gap_report: GapReport | None = None
@@ -217,68 +179,18 @@ class GrowthFlow(Flow[GrowthState]):
         print("\n" + "═" * 60 + "\n")
 
 
-# ── crewai CLI entry points ───────────────────────────────────────────────────
+# ── Entry points ──────────────────────────────────────────────────────────────
 
 def run() -> None:
-    """crewai run → interactive parent session backed by SQLite."""
     create_db_and_tables()
-    child_name, journal_text = _collect_inputs()
-
     with get_session() as session:
-        domain_history = get_domain_history(session, child_name)
-
+        domain_history = get_domain_history(session, _DEMO_CHILD)
     flow = GrowthFlow()
-    flow.state.child_name = child_name
-    flow.state.journal_text = journal_text
     flow.state.domain_history = domain_history
     flow.kickoff()
 
 
-def train() -> None:
-    from rooted_and_rising_crew.main_demo import (
-        _DEMO_CHILD,
-        _DEMO_HISTORY,
-        _DEMO_JOURNAL,
-        _build_inputs as _demo_build,
-    )
-    inputs = _demo_build(_DEMO_CHILD, _DEMO_JOURNAL, _DEMO_HISTORY)
-    try:
-        RootedAndRisingCrew().crew().train(
-            n_iterations=int(sys.argv[1]),
-            filename=sys.argv[2],
-            inputs=inputs,
-        )
-    except Exception as e:
-        raise RuntimeError(f"Training failed: {e}") from e
-
-
-def replay() -> None:
-    try:
-        RootedAndRisingCrew().crew().replay(task_id=sys.argv[1])
-    except Exception as e:
-        raise RuntimeError(f"Replay failed: {e}") from e
-
-
-def test() -> None:
-    from rooted_and_rising_crew.main_demo import (
-        _DEMO_CHILD,
-        _DEMO_HISTORY,
-        _DEMO_JOURNAL,
-        _build_inputs as _demo_build,
-    )
-    inputs = _demo_build(_DEMO_CHILD, _DEMO_JOURNAL, _DEMO_HISTORY)
-    try:
-        RootedAndRisingCrew().crew().test(
-            n_iterations=int(sys.argv[1]),
-            eval_llm=sys.argv[2],
-            inputs=inputs,
-        )
-    except Exception as e:
-        raise RuntimeError(f"Test failed: {e}") from e
-
-
 def run_with_trigger() -> None:
-    """Non-interactive entry point for programmatic/trigger invocation."""
     if len(sys.argv) < 2:
         raise ValueError("No trigger payload provided. Pass JSON as argument.")
     try:
@@ -287,11 +199,8 @@ def run_with_trigger() -> None:
         raise ValueError(f"Invalid JSON payload: {e}") from e
 
     create_db_and_tables()
-    child_name = payload.get("child_name", "")
-    journal_text = payload.get("journal_text", "")
-
-    if not child_name or not journal_text:
-        raise ValueError("Payload must include 'child_name' and 'journal_text'.")
+    child_name = payload.get("child_name", _DEMO_CHILD)
+    journal_text = payload.get("journal_text", _DEMO_JOURNAL)
 
     with get_session() as session:
         domain_history = payload.get(
