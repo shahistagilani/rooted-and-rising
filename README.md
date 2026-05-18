@@ -126,12 +126,16 @@ crewai install
 uv sync          # runtime dependencies only
 uv sync --dev    # include dev tools (pytest, ruff, mypy)
 
-# Add your Anthropic API key
-echo "ANTHROPIC_API_KEY=your_key_here" > .env
+# Set up your API key — the crew won't start without this
+cp .env.example .env
+# Open .env and replace the placeholder with your real key
+# Get one at https://console.anthropic.com/
 
 # Run the crew
 crewai run
 ```
+
+> **Note:** `.env` is gitignored and never committed. `.env.example` is the template — it contains no real keys.
 
 ### Customising agents and tasks
 
