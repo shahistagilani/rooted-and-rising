@@ -110,7 +110,7 @@ rooted-and-rising/
 
 ### Prerequisites
 - Python 3.12+
-- `uv` (Python package manager)
+- `uv` — install via `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ### Setup
 
@@ -119,8 +119,12 @@ rooted-and-rising/
 git clone https://github.com/YOUR_USERNAME/rooted-and-rising.git
 cd rooted-and-rising
 
-# Install dependencies
+# Install dependencies (uses uv under the hood)
 crewai install
+
+# Or use uv directly
+uv sync          # runtime dependencies only
+uv sync --dev    # include dev tools (pytest, ruff, mypy)
 
 # Add your Anthropic API key
 echo "ANTHROPIC_API_KEY=your_key_here" > .env
@@ -134,6 +138,21 @@ crewai run
 - Edit `src/rooted_and_rising_crew/config/agents.yaml` to configure agents
 - Edit `src/rooted_and_rising_crew/config/tasks.yaml` to configure tasks
 - Edit `src/rooted_and_rising_crew/crew.py` to add tools or custom logic
+
+---
+
+## Working with Claude Code
+
+This repo includes CrewAI-specific skills in `.agents/skills/` that Claude Code loads automatically when you open the project. They give the AI coding agent deep knowledge of CrewAI patterns so you get more accurate help.
+
+| Skill | What it helps with |
+|-------|--------------------|
+| `getting-started` | Project scaffolding, Flow vs Crew decisions, YAML wiring |
+| `design-agent` | Configuring agents — LLMs, tools, memory, guardrails |
+| `design-task` | Writing tasks — outputs, dependencies, validation |
+| `ask-docs` | Querying the live CrewAI docs for anything not covered above |
+
+No setup needed — skills are picked up automatically by Claude Code when working in this directory.
 
 ---
 
